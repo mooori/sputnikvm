@@ -1,7 +1,7 @@
 use super::Control;
 use crate::{
-	CallScheme, Capture, Context, CreateScheme, ExitError, ExitFatal, ExitReason, ExitSucceed,
-	Handler, Runtime, Transfer,
+	CallScheme, Capture, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, Handler,
+	Runtime, Transfer,
 };
 use alloc::vec::Vec;
 use core::cmp::min;
@@ -9,15 +9,12 @@ use primitive_types::{H256, U256};
 use sha3::{Digest, Keccak256};
 
 pub fn sha3<H: Handler>(runtime: &mut Runtime) -> Control<H> {
-	pop_u256!(runtime, from, len);
+	pop_usize!(runtime, from, len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(from, len));
-	let data = if len == U256::zero() {
+	let data = if len == 0 {
 		Vec::new()
 	} else {
-		let from = as_usize_or_fail!(from);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory_mut().get(from, len)
 	};
 
@@ -107,7 +104,9 @@ pub fn extcodehash<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H>
 
 pub fn extcodecopy<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	pop_h256!(runtime, address);
-	pop_u256!(runtime, memory_offset, code_offset, len);
+	pop_usize!(runtime, memory_offset);
+	pop_u256!(runtime, code_offset);
+	pop_usize!(runtime, len);
 
 	try_or_fail!(runtime
 		.machine
@@ -134,14 +133,16 @@ pub fn returndatasize<H: Handler>(runtime: &mut Runtime) -> Control<H> {
 }
 
 pub fn returndatacopy<H: Handler>(runtime: &mut Runtime) -> Control<H> {
-	pop_u256!(runtime, memory_offset, data_offset, len);
+	pop_usize!(runtime, memory_offset);
+	pop_u256!(runtime, data_offset);
+	pop_usize!(runtime, len);
 
 	try_or_fail!(runtime
 		.machine
 		.memory_mut()
 		.resize_offset(memory_offset, len));
 	if data_offset
-		.checked_add(len)
+		.checked_add(len.into())
 		.map(|l| l > U256::from(runtime.return_data_buffer.len()))
 		.unwrap_or(true)
 	{
@@ -227,15 +228,12 @@ pub fn gas<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 }
 
 pub fn log<H: Handler>(runtime: &mut Runtime, n: u8, handler: &mut H) -> Control<H> {
-	pop_u256!(runtime, offset, len);
+	pop_usize!(runtime, offset, len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(offset, len));
-	let data = if len == U256::zero() {
+	let data = if len == 0 {
 		Vec::new()
 	} else {
-		let offset = as_usize_or_fail!(offset);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory().get(offset, len)
 	};
 
@@ -269,15 +267,13 @@ pub fn suicide<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H>
 pub fn create<H: Handler>(runtime: &mut Runtime, is_create2: bool, handler: &mut H) -> Control<H> {
 	runtime.return_data_buffer = Vec::new();
 
-	pop_u256!(runtime, value, code_offset, len);
+	pop_u256!(runtime, value);
+	pop_usize!(runtime, code_offset, len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(code_offset, len));
-	let code = if len == U256::zero() {
+	let code = if len == 0 {
 		Vec::new()
 	} else {
-		let code_offset = as_usize_or_fail!(code_offset);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory().get(code_offset, len)
 	};
 
@@ -345,7 +341,7 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		CallScheme::DelegateCall | CallScheme::StaticCall => U256::zero(),
 	};
 
-	pop_u256!(runtime, in_offset, in_len, out_offset, out_len);
+	pop_usize!(runtime, in_offset, in_len, out_offset, out_len);
 
 	try_or_fail!(runtime
 		.machine
@@ -356,12 +352,9 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		.memory_mut()
 		.resize_offset(out_offset, out_len));
 
-	let input = if in_len == U256::zero() {
+	let input = if in_len == 0 {
 		Vec::new()
 	} else {
-		let in_offset = as_usize_or_fail!(in_offset);
-		let in_len = as_usize_or_fail!(in_len);
-
 		runtime.machine.memory().get(in_offset, in_len)
 	};
 
@@ -409,7 +402,7 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 	) {
 		Capture::Exit((reason, return_data)) => {
 			runtime.return_data_buffer = return_data;
-			let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
+			let target_len = min(out_len, runtime.return_data_buffer.len());
 
 			match reason {
 				ExitReason::Succeed(_) => {

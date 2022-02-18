@@ -1,5 +1,5 @@
 use super::Control;
-use crate::{ExitError, ExitFatal, ExitRevert, ExitSucceed, Machine};
+use crate::{ExitError, ExitRevert, ExitSucceed, Machine};
 use core::cmp::min;
 use primitive_types::{H256, U256};
 
@@ -12,7 +12,9 @@ pub fn codesize(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn codecopy(state: &mut Machine) -> Control {
-	pop_u256!(state, memory_offset, code_offset, len);
+	pop_usize!(state, memory_offset);
+	pop_u256!(state, code_offset);
+	pop_usize!(state, len);
 
 	try_or_fail!(state.memory.resize_offset(memory_offset, len));
 	match state
@@ -54,10 +56,12 @@ pub fn calldatasize(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn calldatacopy(state: &mut Machine) -> Control {
-	pop_u256!(state, memory_offset, data_offset, len);
+	pop_usize!(state, memory_offset);
+	pop_u256!(state, data_offset);
+	pop_usize!(state, len);
 
 	try_or_fail!(state.memory.resize_offset(memory_offset, len));
-	if len == U256::zero() {
+	if len == 0 {
 		return Control::Continue(1);
 	}
 
@@ -78,9 +82,8 @@ pub fn pop(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn mload(state: &mut Machine) -> Control {
-	pop_u256!(state, index);
-	try_or_fail!(state.memory.resize_offset(index, U256::from(32)));
-	let index = as_usize_or_fail!(index);
+	pop_usize!(state, index);
+	try_or_fail!(state.memory.resize_offset(index, 32));
 	let value = state.memory.get_h256(index);
 	push_h256!(state, value);
 	Control::Continue(1)
@@ -88,10 +91,9 @@ pub fn mload(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn mstore(state: &mut Machine) -> Control {
-	pop_u256!(state, index);
+	pop_usize!(state, index);
 	pop_h256!(state, value);
-	try_or_fail!(state.memory.resize_offset(index, U256::from(32)));
-	let index = as_usize_or_fail!(index);
+	try_or_fail!(state.memory.resize_offset(index, 32));
 	match state.memory.set(index, &value[..], Some(32)) {
 		Ok(()) => Control::Continue(1),
 		Err(e) => Control::Exit(e.into()),
@@ -100,9 +102,9 @@ pub fn mstore(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn mstore8(state: &mut Machine) -> Control {
-	pop_u256!(state, index, value);
-	try_or_fail!(state.memory.resize_offset(index, U256::one()));
-	let index = as_usize_or_fail!(index);
+	pop_usize!(state, index);
+	pop_u256!(state, value);
+	try_or_fail!(state.memory.resize_offset(index, 1));
 	let value = (value.low_u32() & 0xff) as u8;
 	match state.memory.set(index, &[value], Some(1)) {
 		Ok(()) => Control::Continue(1),
@@ -147,7 +149,7 @@ pub fn pc(state: &mut Machine, position: usize) -> Control {
 
 #[inline]
 pub fn msize(state: &mut Machine) -> Control {
-	push_u256!(state, state.memory.effective_len());
+	push_u256!(state, state.memory.effective_len().into());
 	Control::Continue(1)
 }
 
@@ -194,16 +196,16 @@ pub fn swap(state: &mut Machine, n: usize) -> Control {
 
 #[inline]
 pub fn ret(state: &mut Machine) -> Control {
-	pop_u256!(state, start, len);
+	pop_usize!(state, start, len);
 	try_or_fail!(state.memory.resize_offset(start, len));
-	state.return_range = start..(start + len);
+	state.return_range = start.into()..(start + len).into();
 	Control::Exit(ExitSucceed::Returned.into())
 }
 
 #[inline]
 pub fn revert(state: &mut Machine) -> Control {
-	pop_u256!(state, start, len);
+	pop_usize!(state, start, len);
 	try_or_fail!(state.memory.resize_offset(start, len));
-	state.return_range = start..(start + len);
+	state.return_range = start.into()..(start + len).into();
 	Control::Exit(ExitRevert::Reverted.into())
 }

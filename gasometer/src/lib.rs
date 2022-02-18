@@ -619,54 +619,54 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		| Opcode::LOG2
 		| Opcode::LOG3
 		| Opcode::LOG4 => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: stack.peek(1)?,
+			offset: stack.peek_usize(0)?,
+			len: stack.peek_usize(1)?,
 		}),
 
 		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: stack.peek(2)?,
+			offset: stack.peek_usize(0)?,
+			len: stack.peek_usize(2)?,
 		}),
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
-			offset: stack.peek(1)?,
-			len: stack.peek(3)?,
+			offset: stack.peek_usize(1)?,
+			len: stack.peek_usize(3)?,
 		}),
 
 		Opcode::MLOAD | Opcode::MSTORE => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: U256::from(32),
+			offset: stack.peek_usize(0)?,
+			len: 32,
 		}),
 
 		Opcode::MSTORE8 => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: U256::from(1),
+			offset: stack.peek_usize(0)?,
+			len: 1,
 		}),
 
 		Opcode::CREATE | Opcode::CREATE2 => Some(MemoryCost {
-			offset: stack.peek(1)?,
-			len: stack.peek(2)?,
+			offset: stack.peek_usize(1)?,
+			len: stack.peek_usize(2)?,
 		}),
 
 		Opcode::CALL | Opcode::CALLCODE => Some(
 			MemoryCost {
-				offset: stack.peek(3)?,
-				len: stack.peek(4)?,
+				offset: stack.peek_usize(3)?,
+				len: stack.peek_usize(4)?,
 			}
 			.join(MemoryCost {
-				offset: stack.peek(5)?,
-				len: stack.peek(6)?,
+				offset: stack.peek_usize(5)?,
+				len: stack.peek_usize(6)?,
 			}),
 		),
 
 		Opcode::DELEGATECALL | Opcode::STATICCALL => Some(
 			MemoryCost {
-				offset: stack.peek(2)?,
-				len: stack.peek(3)?,
+				offset: stack.peek_usize(2)?,
+				len: stack.peek_usize(3)?,
 			}
 			.join(MemoryCost {
-				offset: stack.peek(4)?,
-				len: stack.peek(5)?,
+				offset: stack.peek_usize(4)?,
+				len: stack.peek_usize(5)?,
 			}),
 		),
 
@@ -690,16 +690,11 @@ impl<'config> Inner<'config> {
 		let from = memory.offset;
 		let len = memory.len;
 
-		if len == U256::zero() {
+		if len == 0 {
 			return Ok(self.memory_gas);
 		}
 
 		let end = from.checked_add(len).ok_or(ExitError::OutOfGas)?;
-
-		if end > U256::from(usize::MAX) {
-			return Err(ExitError::OutOfGas);
-		}
-		let end = end.as_usize();
 
 		let rem = end % 32;
 		let new = if rem == 0 { end / 32 } else { end / 32 + 1 };
@@ -989,9 +984,9 @@ pub enum StorageTarget {
 #[derive(Debug, Clone, Copy)]
 pub struct MemoryCost {
 	/// Affected memory offset.
-	pub offset: U256,
+	pub offset: usize,
 	/// Affected length.
-	pub len: U256,
+	pub len: usize,
 }
 
 /// Transaction cost.
@@ -1024,11 +1019,11 @@ pub enum TransactionCost {
 impl MemoryCost {
 	/// Join two memory cost together.
 	pub fn join(self, other: MemoryCost) -> MemoryCost {
-		if self.len == U256::zero() {
+		if self.len == 0 {
 			return other;
 		}
 
-		if other.len == U256::zero() {
+		if other.len == 0 {
 			return self;
 		}
 
