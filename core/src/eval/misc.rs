@@ -12,9 +12,18 @@ pub fn codesize(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn codecopy(state: &mut Machine) -> Control {
-	pop_usize!(state, memory_offset);
+	pop_u256!(state, memory_offset);
 	pop_u256!(state, code_offset);
 	pop_usize!(state, len);
+
+	// If `len` is zero then nothing happens, regardless of the
+	// value of the other parameters. In particular, `memory_offset`
+	// might be larger than `usize::MAX`, hence why we check this first.
+	if len == 0 {
+		return Control::Continue(1);
+	}
+
+	let memory_offset = memory_offset.as_usize();
 
 	try_or_fail!(state.memory.resize_offset(memory_offset, len));
 	match state
@@ -56,14 +65,16 @@ pub fn calldatasize(state: &mut Machine) -> Control {
 
 #[inline]
 pub fn calldatacopy(state: &mut Machine) -> Control {
-	pop_usize!(state, memory_offset);
+	pop_u256!(state, memory_offset);
 	pop_u256!(state, data_offset);
 	pop_usize!(state, len);
 
-	try_or_fail!(state.memory.resize_offset(memory_offset, len));
+	// See comment on `codecopy` about the `len == 0` case.
 	if len == 0 {
 		return Control::Continue(1);
 	}
+	let memory_offset = memory_offset.as_usize();
+	try_or_fail!(state.memory.resize_offset(memory_offset, len));
 
 	match state
 		.memory
