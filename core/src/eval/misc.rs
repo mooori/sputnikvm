@@ -207,16 +207,22 @@ pub fn swap(state: &mut Machine, n: usize) -> Control {
 
 #[inline]
 pub fn ret(state: &mut Machine) -> Control {
-	pop_usize!(state, start, len);
-	try_or_fail!(state.memory.resize_offset(start, len));
-	state.return_range = start.into()..(start + len).into();
+	pop_u256!(state, start);
+	pop_usize!(state, len);
+	if len > 0 {
+		try_or_fail!(state.memory.resize_offset(start.as_usize(), len));
+	}
+	state.return_range = start..(start + U256::from(len));
 	Control::Exit(ExitSucceed::Returned.into())
 }
 
 #[inline]
 pub fn revert(state: &mut Machine) -> Control {
-	pop_usize!(state, start, len);
-	try_or_fail!(state.memory.resize_offset(start, len));
-	state.return_range = start.into()..(start + len).into();
+	pop_u256!(state, start);
+	pop_usize!(state, len);
+	if len > 0 {
+		try_or_fail!(state.memory.resize_offset(start.as_usize(), len));
+	}
+	state.return_range = start..(start + U256::from(len));
 	Control::Exit(ExitRevert::Reverted.into())
 }

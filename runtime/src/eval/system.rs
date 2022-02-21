@@ -9,7 +9,14 @@ use primitive_types::{H256, U256};
 use sha3::{Digest, Keccak256};
 
 pub fn sha3<H: Handler>(runtime: &mut Runtime) -> Control<H> {
-	pop_usize!(runtime, from, len);
+	pop_u256!(runtime, from);
+	pop_usize!(runtime, len);
+
+	let from = if len == 0 {
+		usize::MAX
+	} else {
+		from.as_usize()
+	};
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(from, len));
 	let data = if len == 0 {
@@ -104,9 +111,15 @@ pub fn extcodehash<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H>
 
 pub fn extcodecopy<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	pop_h256!(runtime, address);
-	pop_usize!(runtime, memory_offset);
+	pop_u256!(runtime, memory_offset);
 	pop_u256!(runtime, code_offset);
 	pop_usize!(runtime, len);
+
+	if len == 0 {
+		return Control::Continue;
+	}
+
+	let memory_offset = memory_offset.as_usize();
 
 	try_or_fail!(runtime
 		.machine
@@ -228,7 +241,14 @@ pub fn gas<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 }
 
 pub fn log<H: Handler>(runtime: &mut Runtime, n: u8, handler: &mut H) -> Control<H> {
-	pop_usize!(runtime, offset, len);
+	pop_u256!(runtime, offset);
+	pop_usize!(runtime, len);
+
+	let offset = if len == 0 {
+		usize::MAX
+	} else {
+		offset.as_usize()
+	};
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(offset, len));
 	let data = if len == 0 {
@@ -268,7 +288,14 @@ pub fn create<H: Handler>(runtime: &mut Runtime, is_create2: bool, handler: &mut
 	runtime.return_data_buffer = Vec::new();
 
 	pop_u256!(runtime, value);
-	pop_usize!(runtime, code_offset, len);
+	pop_u256!(runtime, code_offset);
+	pop_usize!(runtime, len);
+
+	let code_offset = if len == 0 {
+		usize::MAX
+	} else {
+		code_offset.as_usize()
+	};
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(code_offset, len));
 	let code = if len == 0 {
@@ -341,7 +368,21 @@ pub fn call<H: Handler>(runtime: &mut Runtime, scheme: CallScheme, handler: &mut
 		CallScheme::DelegateCall | CallScheme::StaticCall => U256::zero(),
 	};
 
-	pop_usize!(runtime, in_offset, in_len, out_offset, out_len);
+	pop_u256!(runtime, in_offset);
+	pop_usize!(runtime, in_len);
+	pop_u256!(runtime, out_offset);
+	pop_usize!(runtime, out_len);
+
+	let in_offset = if in_len == 0 {
+		usize::MAX
+	} else {
+		in_offset.as_usize()
+	};
+	let out_offset = if out_len == 0 {
+		usize::MAX
+	} else {
+		out_offset.as_usize()
+	};
 
 	try_or_fail!(runtime
 		.machine
