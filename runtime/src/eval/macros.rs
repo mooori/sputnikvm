@@ -69,4 +69,3 @@ macro_rules! pop_usize {
 		)*
 	);
 }
-

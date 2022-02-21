@@ -620,7 +620,9 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		| Opcode::LOG3
 		| Opcode::LOG4 => Some(peek_memory_cost(stack, 0, 1)?),
 
-		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => Some(peek_memory_cost(stack, 0, 2)?),
+		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => {
+			Some(peek_memory_cost(stack, 0, 2)?)
+		}
 
 		Opcode::EXTCODECOPY => Some(peek_memory_cost(stack, 1, 3)?),
 
@@ -636,15 +638,13 @@ pub fn dynamic_opcode_cost<H: Handler>(
 
 		Opcode::CREATE | Opcode::CREATE2 => Some(peek_memory_cost(stack, 1, 2)?),
 
-		Opcode::CALL | Opcode::CALLCODE => Some(
-			peek_memory_cost(stack, 3, 4)?
-				.join(peek_memory_cost(stack, 5, 6)?)
-		),
+		Opcode::CALL | Opcode::CALLCODE => {
+			Some(peek_memory_cost(stack, 3, 4)?.join(peek_memory_cost(stack, 5, 6)?))
+		}
 
-		Opcode::DELEGATECALL | Opcode::STATICCALL => Some(
-			peek_memory_cost(stack, 2, 3)?
-				.join(peek_memory_cost(stack, 4, 5)?)
-		),
+		Opcode::DELEGATECALL | Opcode::STATICCALL => {
+			Some(peek_memory_cost(stack, 2, 3)?.join(peek_memory_cost(stack, 4, 5)?))
+		}
 
 		_ => None,
 	};
@@ -652,9 +652,13 @@ pub fn dynamic_opcode_cost<H: Handler>(
 	Ok((gas_cost, storage_target, memory_cost))
 }
 
-fn peek_memory_cost(stack: &Stack, offset_index: usize, len_index: usize) -> Result<MemoryCost, ExitError> {
+fn peek_memory_cost(
+	stack: &Stack,
+	offset_index: usize,
+	len_index: usize,
+) -> Result<MemoryCost, ExitError> {
 	let len = stack.peek_usize(len_index)?;
-	
+
 	if len == 0 {
 		return Ok(MemoryCost {
 			offset: usize::MAX,
@@ -663,10 +667,7 @@ fn peek_memory_cost(stack: &Stack, offset_index: usize, len_index: usize) -> Res
 	}
 
 	let offset = stack.peek_usize(offset_index)?;
-	Ok(MemoryCost {
-		offset,
-		len,
-	})
+	Ok(MemoryCost { offset, len })
 }
 
 /// Holds the gas consumption for a Gasometer instance.
