@@ -183,7 +183,7 @@ pub fn push2(state: &mut Machine, position: usize) -> Control {
 #[inline]
 pub fn dup(state: &mut Machine, n: usize) -> Control {
 	let value = match state.stack.peek(n - 1) {
-		Ok(value) => value,
+		Ok(&value) => value,
 		Err(e) => return Control::Exit(e.into()),
 	};
 	push_u256!(state, value);
@@ -193,11 +193,11 @@ pub fn dup(state: &mut Machine, n: usize) -> Control {
 #[inline]
 pub fn swap(state: &mut Machine, n: usize) -> Control {
 	let val1 = match state.stack.peek(0) {
-		Ok(value) => value,
+		Ok(&value) => value,
 		Err(e) => return Control::Exit(e.into()),
 	};
 	let val2 = match state.stack.peek(n) {
-		Ok(value) => value,
+		Ok(&value) => value,
 		Err(e) => return Control::Exit(e.into()),
 	};
 	match state.stack.set(0, val2) {

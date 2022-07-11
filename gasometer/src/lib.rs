@@ -499,8 +499,8 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			let target = stack.peek_h256(1)?.into();
 			storage_target = StorageTarget::Address(target);
 			GasCost::CallCode {
-				value: stack.peek(2)?,
-				gas: stack.peek(0)?,
+				value: *stack.peek(2)?,
+				gas: *stack.peek(0)?,
 				target_is_cold: handler.is_cold(target, None),
 				target_exists: handler.exists(target),
 			}
@@ -509,27 +509,27 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			let target = stack.peek_h256(1)?.into();
 			storage_target = StorageTarget::Address(target);
 			GasCost::StaticCall {
-				gas: stack.peek(0)?,
+				gas: *stack.peek(0)?,
 				target_is_cold: handler.is_cold(target, None),
 				target_exists: handler.exists(target),
 			}
 		}
 		Opcode::SHA3 => GasCost::Sha3 {
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::EXTCODECOPY => {
 			let target = stack.peek_h256(0)?.into();
 			storage_target = StorageTarget::Address(target);
 			GasCost::ExtCodeCopy {
 				target_is_cold: handler.is_cold(target, None),
-				len: stack.peek(3)?,
+				len: *stack.peek(3)?,
 			}
 		}
 		Opcode::CALLDATACOPY | Opcode::CODECOPY => GasCost::VeryLowCopy {
-			len: stack.peek(2)?,
+			len: *stack.peek(2)?,
 		},
 		Opcode::EXP => GasCost::Exp {
-			power: stack.peek(1)?,
+			power: *stack.peek(1)?,
 		},
 		Opcode::SLOAD => {
 			let index = stack.peek_h256(0)?;
@@ -543,7 +543,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			let target = stack.peek_h256(1)?.into();
 			storage_target = StorageTarget::Address(target);
 			GasCost::DelegateCall {
-				gas: stack.peek(0)?,
+				gas: *stack.peek(0)?,
 				target_is_cold: handler.is_cold(target, None),
 				target_exists: handler.exists(target),
 			}
@@ -552,7 +552,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 
 		Opcode::RETURNDATASIZE if config.has_return_data => GasCost::Base,
 		Opcode::RETURNDATACOPY if config.has_return_data => GasCost::VeryLowCopy {
-			len: stack.peek(2)?,
+			len: *stack.peek(2)?,
 		},
 		Opcode::RETURNDATASIZE | Opcode::RETURNDATACOPY => GasCost::Invalid,
 
@@ -570,27 +570,27 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		}
 		Opcode::LOG0 if !is_static => GasCost::Log {
 			n: 0,
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::LOG1 if !is_static => GasCost::Log {
 			n: 1,
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::LOG2 if !is_static => GasCost::Log {
 			n: 2,
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::LOG3 if !is_static => GasCost::Log {
 			n: 3,
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::LOG4 if !is_static => GasCost::Log {
 			n: 4,
-			len: stack.peek(1)?,
+			len: *stack.peek(1)?,
 		},
 		Opcode::CREATE if !is_static => GasCost::Create,
 		Opcode::CREATE2 if !is_static && config.has_create2 => GasCost::Create2 {
-			len: stack.peek(2)?,
+			len: *stack.peek(2)?,
 		},
 		Opcode::SUICIDE if !is_static => {
 			let target = stack.peek_h256(0)?.into();
@@ -602,12 +602,12 @@ pub fn dynamic_opcode_cost<H: Handler>(
 				already_removed: handler.deleted(address),
 			}
 		}
-		Opcode::CALL if !is_static || (is_static && stack.peek(2)? == U256::zero()) => {
+		Opcode::CALL if !is_static || (is_static && *stack.peek(2)? == U256::zero()) => {
 			let target = stack.peek_h256(1)?.into();
 			storage_target = StorageTarget::Address(target);
 			GasCost::Call {
-				value: stack.peek(2)?,
-				gas: stack.peek(0)?,
+				value: *stack.peek(2)?,
+				gas: *stack.peek(0)?,
 				target_is_cold: handler.is_cold(target, None),
 				target_exists: handler.exists(target),
 			}
@@ -625,54 +625,54 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		| Opcode::LOG2
 		| Opcode::LOG3
 		| Opcode::LOG4 => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: stack.peek(1)?,
+			offset: *stack.peek(0)?,
+			len: *stack.peek(1)?,
 		}),
 
 		Opcode::CODECOPY | Opcode::CALLDATACOPY | Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: stack.peek(0)?,
-			len: stack.peek(2)?,
+			offset: *stack.peek(0)?,
+			len: *stack.peek(2)?,
 		}),
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
-			offset: stack.peek(1)?,
-			len: stack.peek(3)?,
+			offset: *stack.peek(1)?,
+			len: *stack.peek(3)?,
 		}),
 
 		Opcode::MLOAD | Opcode::MSTORE => Some(MemoryCost {
-			offset: stack.peek(0)?,
+			offset: *stack.peek(0)?,
 			len: U256::from(32),
 		}),
 
 		Opcode::MSTORE8 => Some(MemoryCost {
-			offset: stack.peek(0)?,
+			offset: *stack.peek(0)?,
 			len: U256::from(1),
 		}),
 
 		Opcode::CREATE | Opcode::CREATE2 => Some(MemoryCost {
-			offset: stack.peek(1)?,
-			len: stack.peek(2)?,
+			offset: *stack.peek(1)?,
+			len: *stack.peek(2)?,
 		}),
 
 		Opcode::CALL | Opcode::CALLCODE => Some(
 			MemoryCost {
-				offset: stack.peek(3)?,
-				len: stack.peek(4)?,
+				offset: *stack.peek(3)?,
+				len: *stack.peek(4)?,
 			}
 			.join(MemoryCost {
-				offset: stack.peek(5)?,
-				len: stack.peek(6)?,
+				offset: *stack.peek(5)?,
+				len: *stack.peek(6)?,
 			}),
 		),
 
 		Opcode::DELEGATECALL | Opcode::STATICCALL => Some(
 			MemoryCost {
-				offset: stack.peek(2)?,
-				len: stack.peek(3)?,
+				offset: *stack.peek(2)?,
+				len: *stack.peek(3)?,
 			}
 			.join(MemoryCost {
-				offset: stack.peek(4)?,
-				len: stack.peek(5)?,
+				offset: *stack.peek(4)?,
+				len: *stack.peek(5)?,
 			}),
 		),
 
