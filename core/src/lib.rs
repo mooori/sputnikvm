@@ -24,6 +24,7 @@ pub use crate::valids::Valids;
 use crate::eval::{eval, Control};
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use bytes::Bytes;
 use core::ops::Range;
 use primitive_types::{H160, U256};
 
@@ -32,7 +33,7 @@ pub struct Machine {
 	/// Program data.
 	data: Rc<Vec<u8>>,
 	/// Program code.
-	code: Rc<Vec<u8>>,
+	code: Bytes,
 	/// Program counter.
 	position: Result<usize, ExitReason>,
 	/// Return value.
@@ -86,12 +87,7 @@ impl Machine {
 	}
 
 	/// Create a new machine with given code and data.
-	pub fn new(
-		code: Rc<Vec<u8>>,
-		data: Rc<Vec<u8>>,
-		stack_limit: usize,
-		memory_limit: usize,
-	) -> Self {
+	pub fn new(code: Bytes, data: Rc<Vec<u8>>, stack_limit: usize, memory_limit: usize) -> Self {
 		let valids = Valids::new(&code[..]);
 
 		Self {

@@ -9,6 +9,7 @@ keywords = ["no_std", "ethereum"]
 edition = "2018"
 
 [dependencies]
+bytes = { version = "1", default-features = false }
 evm-core = { version = "0.33", path = "../core", default-features = false }
 primitive-types = { version = "0.10", default-features = false }
 sha3 = { version = "0.8", default-features = false }

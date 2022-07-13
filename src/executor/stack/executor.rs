@@ -703,12 +703,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 			self.state.inc_nonce(address);
 		}
 
-		let mut runtime = Runtime::new(
-			Rc::new(init_code),
-			Rc::new(Vec::new()),
-			context,
-			self.config,
-		);
+		let mut runtime = Runtime::new(init_code.into(), Rc::new(Vec::new()), context, self.config);
 
 		let reason = self.execute(&mut runtime);
 		log::debug!(target: "evm", "Create execution using address {}: {:?}", address, reason);
@@ -905,7 +900,7 @@ impl<'config, 'precompiles, S: StackState<'config>, P: PrecompileSet>
 			};
 		}
 
-		let mut runtime = Runtime::new(Rc::new(code), Rc::new(input), context, self.config);
+		let mut runtime = Runtime::new(code.into(), Rc::new(input), context, self.config);
 
 		let reason = self.execute(&mut runtime);
 		log::debug!(target: "evm", "Call execution using address {}: {:?}", code_address, reason);

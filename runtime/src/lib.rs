@@ -35,6 +35,7 @@ pub use crate::interrupt::{Resolve, ResolveCall, ResolveCreate};
 
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use bytes::Bytes;
 
 macro_rules! step {
 	( $self:expr, $handler:expr, $return:tt $($err:path)?; $($ok:path)? ) => ({
@@ -84,12 +85,7 @@ pub struct Runtime<'config> {
 
 impl<'config> Runtime<'config> {
 	/// Create a new runtime with given code and data.
-	pub fn new(
-		code: Rc<Vec<u8>>,
-		data: Rc<Vec<u8>>,
-		context: Context,
-		config: &'config Config,
-	) -> Self {
+	pub fn new(code: Bytes, data: Rc<Vec<u8>>, context: Context, config: &'config Config) -> Self {
 		Self {
 			machine: Machine::new(code, data, config.stack_limit, config.memory_limit),
 			status: Ok(()),
