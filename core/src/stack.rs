@@ -1,11 +1,14 @@
 use crate::ExitError;
-use alloc::vec::Vec;
+use arrayvec::ArrayVec;
 use primitive_types::{H256, U256};
+
+// https://ethereum.org/en/developers/docs/evm/#evm-instructions
+const STACK_SIZE: usize = 1024;
 
 /// EVM stack.
 #[derive(Clone, Debug)]
 pub struct Stack {
-	data: Vec<U256>,
+	data: ArrayVec<U256, STACK_SIZE>,
 	limit: usize,
 }
 
@@ -13,7 +16,7 @@ impl Stack {
 	/// Create a new stack with given limit.
 	pub fn new(limit: usize) -> Self {
 		Self {
-			data: Vec::new(),
+			data: ArrayVec::new(),
 			limit,
 		}
 	}
@@ -38,8 +41,8 @@ impl Stack {
 
 	#[inline]
 	/// Stack data.
-	pub fn data(&self) -> &Vec<U256> {
-		&self.data
+	pub fn data(&self) -> &[U256] {
+		self.data.as_ref()
 	}
 
 	#[inline]
