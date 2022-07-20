@@ -3,6 +3,22 @@ use crate::Config;
 use evm_core::ExitError;
 use primitive_types::{H256, U256};
 
+// Declare these constant variables to allocate the wrapped arrays only once.
+const H256_DEFAULT: H256 = H256([0; 32]);
+const U256_ZERO: U256 = U256([0; 4]);
+const U256_ONE: U256 = U256([1, 0, 0, 0]);
+
+const U256_G_COPY: U256 = U256([G_COPY as u64, 0, 0, 0]);
+const U256_G_CREATE: U256 = U256([G_CREATE as u64, 0, 0, 0]);
+const U256_G_EXP: U256 = U256([G_EXP as u64, 0, 0, 0]);
+const U256_G_LOG: U256 = U256([G_LOG as u64, 0, 0, 0]);
+const U256_G_LOGDATA: U256 = U256([G_LOGDATA as u64, 0, 0, 0]);
+const U256_G_SHA3: U256 = U256([G_SHA3 as u64, 0, 0, 0]);
+const U256_G_SHA3WORD: U256 = U256([G_SHA3WORD as u64, 0, 0, 0]);
+const U256_G_VERYLOW: U256 = U256([G_VERYLOW as u64, 0, 0, 0]);
+const U256_32: U256 = U256([32, 0, 0, 0]);
+const U256_U64_MAX: U256 = U256([u64::MAX, 0, 0, 0]);
+
 pub fn call_extra_check(gas: U256, after_gas: u64, config: &Config) -> Result<(), ExitError> {
 	if config.err_on_call_with_more_gas && U256::from(after_gas) < gas {
 		Err(ExitError::OutOfGas)
@@ -25,21 +41,21 @@ pub fn sstore_refund(original: H256, current: H256, new: H256, config: &Config) 
 		if current == new {
 			0
 		} else {
-			if original == current && new == H256::default() {
+			if original == current && new == H256_DEFAULT {
 				config.refund_sstore_clears
 			} else {
 				let mut refund = 0;
 
-				if original != H256::default() {
-					if current == H256::default() {
+				if original != H256_DEFAULT {
+					if current == H256_DEFAULT {
 						refund -= config.refund_sstore_clears;
-					} else if new == H256::default() {
+					} else if new == H256_DEFAULT {
 						refund += config.refund_sstore_clears;
 					}
 				}
 
 				if original == new {
-					if original == H256::default() {
+					if original == H256_DEFAULT {
 						refund += (config.gas_sstore_set - config.gas_sload) as i64;
 					} else {
 						refund += (config.gas_sstore_reset - config.gas_sload) as i64;
@@ -50,7 +66,7 @@ pub fn sstore_refund(original: H256, current: H256, new: H256, config: &Config) 
 			}
 		}
 	} else {
-		if current != H256::default() && new == H256::default() {
+		if current != H256_DEFAULT && new == H256_DEFAULT {
 			config.refund_sstore_clears
 		} else {
 			0
@@ -59,20 +75,20 @@ pub fn sstore_refund(original: H256, current: H256, new: H256, config: &Config) 
 }
 
 pub fn create2_cost(len: U256) -> Result<u64, ExitError> {
-	let base = U256::from(G_CREATE);
+	let base = U256_G_CREATE;
 	// ceil(len / 32.0)
-	let sha_addup_base = len / U256::from(32)
-		+ if len % U256::from(32) == U256::zero() {
-			U256::zero()
+	let sha_addup_base = len / U256_32
+		+ if len % U256_32 == U256_ZERO {
+			U256_ZERO
 		} else {
-			U256::one()
+			U256_ONE
 		};
-	let sha_addup = U256::from(G_SHA3WORD)
+	let sha_addup = U256_G_SHA3WORD
 		.checked_mul(sha_addup_base)
 		.ok_or(ExitError::OutOfGas)?;
 	let gas = base.checked_add(sha_addup).ok_or(ExitError::OutOfGas)?;
 
-	if gas > U256::from(u64::MAX) {
+	if gas > U256_U64_MAX {
 		return Err(ExitError::OutOfGas);
 	}
 
@@ -80,10 +96,10 @@ pub fn create2_cost(len: U256) -> Result<u64, ExitError> {
 }
 
 pub fn exp_cost(power: U256, config: &Config) -> Result<u64, ExitError> {
-	if power == U256::zero() {
+	if power == U256_ZERO {
 		Ok(G_EXP as u64)
 	} else {
-		let gas = U256::from(G_EXP)
+		let gas = U256_G_EXP
 			.checked_add(
 				U256::from(config.gas_expbyte)
 					.checked_mul(U256::from(crate::utils::log2floor(power) / 8 + 1))
@@ -91,7 +107,7 @@ pub fn exp_cost(power: U256, config: &Config) -> Result<u64, ExitError> {
 			)
 			.ok_or(ExitError::OutOfGas)?;
 
-		if gas > U256::from(u64::MAX) {
+		if gas > U256_U64_MAX {
 			return Err(ExitError::OutOfGas);
 		}
 
@@ -100,22 +116,22 @@ pub fn exp_cost(power: U256, config: &Config) -> Result<u64, ExitError> {
 }
 
 pub fn verylowcopy_cost(len: U256) -> Result<u64, ExitError> {
-	let wordd = len / U256::from(32);
-	let wordr = len % U256::from(32);
+	let wordd = len / U256_32;
+	let wordr = len % U256_32;
 
-	let gas = U256::from(G_VERYLOW)
+	let gas = U256_G_VERYLOW
 		.checked_add(
-			U256::from(G_COPY)
-				.checked_mul(if wordr == U256::zero() {
+			U256_G_COPY
+				.checked_mul(if wordr == U256_ZERO {
 					wordd
 				} else {
-					wordd + U256::one()
+					wordd + U256_ONE
 				})
 				.ok_or(ExitError::OutOfGas)?,
 		)
 		.ok_or(ExitError::OutOfGas)?;
 
-	if gas > U256::from(u64::MAX) {
+	if gas > U256_U64_MAX {
 		return Err(ExitError::OutOfGas);
 	}
 
@@ -123,21 +139,21 @@ pub fn verylowcopy_cost(len: U256) -> Result<u64, ExitError> {
 }
 
 pub fn extcodecopy_cost(len: U256, is_cold: bool, config: &Config) -> Result<u64, ExitError> {
-	let wordd = len / U256::from(32);
-	let wordr = len % U256::from(32);
+	let wordd = len / U256_32;
+	let wordr = len % U256_32;
 	let gas = U256::from(address_access_cost(is_cold, config.gas_ext_code, config))
 		.checked_add(
-			U256::from(G_COPY)
-				.checked_mul(if wordr == U256::zero() {
+			U256_G_COPY
+				.checked_mul(if wordr == U256_ZERO {
 					wordd
 				} else {
-					wordd + U256::one()
+					wordd + U256_ONE
 				})
 				.ok_or(ExitError::OutOfGas)?,
 		)
 		.ok_or(ExitError::OutOfGas)?;
 
-	if gas > U256::from(u64::MAX) {
+	if gas > U256_U64_MAX {
 		return Err(ExitError::OutOfGas);
 	}
 
@@ -145,17 +161,13 @@ pub fn extcodecopy_cost(len: U256, is_cold: bool, config: &Config) -> Result<u64
 }
 
 pub fn log_cost(n: u8, len: U256) -> Result<u64, ExitError> {
-	let gas = U256::from(G_LOG)
-		.checked_add(
-			U256::from(G_LOGDATA)
-				.checked_mul(len)
-				.ok_or(ExitError::OutOfGas)?,
-		)
+	let gas = U256_G_LOG
+		.checked_add(U256_G_LOGDATA.checked_mul(len).ok_or(ExitError::OutOfGas)?)
 		.ok_or(ExitError::OutOfGas)?
 		.checked_add(U256::from(G_LOGTOPIC * n as u32))
 		.ok_or(ExitError::OutOfGas)?;
 
-	if gas > U256::from(u64::MAX) {
+	if gas > U256_U64_MAX {
 		return Err(ExitError::OutOfGas);
 	}
 
@@ -163,22 +175,22 @@ pub fn log_cost(n: u8, len: U256) -> Result<u64, ExitError> {
 }
 
 pub fn sha3_cost(len: U256) -> Result<u64, ExitError> {
-	let wordd = len / U256::from(32);
-	let wordr = len % U256::from(32);
+	let wordd = len / U256_32;
+	let wordr = len % U256_32;
 
-	let gas = U256::from(G_SHA3)
+	let gas = U256_G_SHA3
 		.checked_add(
-			U256::from(G_SHA3WORD)
-				.checked_mul(if wordr == U256::zero() {
+			U256_G_SHA3WORD
+				.checked_mul(if wordr == U256_ZERO {
 					wordd
 				} else {
-					wordd + U256::one()
+					wordd + U256_ONE
 				})
 				.ok_or(ExitError::OutOfGas)?,
 		)
 		.ok_or(ExitError::OutOfGas)?;
 
-	if gas > U256::from(u64::MAX) {
+	if gas > U256_U64_MAX {
 		return Err(ExitError::OutOfGas);
 	}
 
@@ -248,7 +260,7 @@ pub fn sstore_cost(
 pub fn suicide_cost(value: U256, is_cold: bool, target_exists: bool, config: &Config) -> u64 {
 	let eip161 = !config.empty_considered_exists;
 	let should_charge_topup = if eip161 {
-		value != U256::zero() && !target_exists
+		value != U256_ZERO && !target_exists
 	} else {
 		!target_exists
 	};
