@@ -33,18 +33,6 @@ use evm_core::{ExitError, Opcode, Stack};
 use evm_runtime::{Config, Handler};
 use primitive_types::{H160, H256, U256};
 
-macro_rules! try_or_fail {
-	( $inner:expr, $e:expr ) => {
-		match $e {
-			Ok(value) => value,
-			Err(e) => {
-				$inner = Err(e.clone());
-				return Err(e);
-			}
-		}
-	};
-}
-
 #[cfg(feature = "tracing")]
 #[derive(Debug, Copy, Clone)]
 pub struct Snapshot {
@@ -55,11 +43,12 @@ pub struct Snapshot {
 }
 
 /// EVM gasometer.
+// TODO explain it shouldn't be used anymore after a method returned `Err(_)`.
 #[derive(Clone, Debug)]
 pub struct Gasometer<'config> {
 	gas_limit: u64,
 	config: &'config Config,
-	inner: Result<Inner<'config>, ExitError>,
+	inner: Inner<'config>,
 }
 
 impl<'config> Gasometer<'config> {
@@ -68,27 +57,19 @@ impl<'config> Gasometer<'config> {
 		Self {
 			gas_limit,
 			config,
-			inner: Ok(Inner {
+			inner: Inner {
 				memory_gas: 0,
 				used_gas: 0,
 				refunded_gas: 0,
 				config,
-			}),
+			},
 		}
 	}
 
 	#[inline]
 	/// Returns the numerical gas cost value.
 	pub fn gas_cost(&self, cost: GasCost, gas: u64) -> Result<u64, ExitError> {
-		match self.inner.as_ref() {
-			Ok(inner) => inner.gas_cost(cost, gas),
-			Err(e) => Err(e.clone()),
-		}
-	}
-
-	#[inline]
-	fn inner_mut(&mut self) -> Result<&mut Inner<'config>, ExitError> {
-		self.inner.as_mut().map_err(|e| e.clone())
+		self.inner.gas_cost(cost, gas)
 	}
 
 	#[inline]
@@ -106,33 +87,24 @@ impl<'config> Gasometer<'config> {
 	#[inline]
 	/// Remaining gas.
 	pub fn gas(&self) -> u64 {
-		match self.inner.as_ref() {
-			Ok(inner) => self.gas_limit - inner.used_gas - inner.memory_gas,
-			Err(_) => 0,
-		}
+		self.gas_limit - self.inner.used_gas - self.inner.memory_gas
 	}
 
 	#[inline]
 	/// Total used gas.
 	pub fn total_used_gas(&self) -> u64 {
-		match self.inner.as_ref() {
-			Ok(inner) => inner.used_gas + inner.memory_gas,
-			Err(_) => self.gas_limit,
-		}
+		self.inner.used_gas + self.inner.memory_gas
 	}
 
 	#[inline]
 	/// Refunded gas.
 	pub fn refunded_gas(&self) -> i64 {
-		match self.inner.as_ref() {
-			Ok(inner) => inner.refunded_gas,
-			Err(_) => 0,
-		}
+		self.inner.refunded_gas
 	}
 
 	/// Explicitly fail the gasometer with out of gas. Return `OutOfGas` error.
+	// TODO remove, it's pointless without field which contains `Result`.
 	pub fn fail(&mut self) -> ExitError {
-		self.inner = Err(ExitError::OutOfGas);
 		ExitError::OutOfGas
 	}
 
@@ -146,11 +118,10 @@ impl<'config> Gasometer<'config> {
 
 		let all_gas_cost = self.total_used_gas() + cost;
 		if self.gas_limit < all_gas_cost {
-			self.inner = Err(ExitError::OutOfGas);
 			return Err(ExitError::OutOfGas);
 		}
 
-		self.inner_mut()?.used_gas += cost;
+		self.inner.used_gas += cost;
 		Ok(())
 	}
 
@@ -162,7 +133,7 @@ impl<'config> Gasometer<'config> {
 			snapshot: self.snapshot(),
 		});
 
-		self.inner_mut()?.refunded_gas += refund;
+		self.inner.refunded_gas += refund;
 		Ok(())
 	}
 
@@ -182,12 +153,12 @@ impl<'config> Gasometer<'config> {
 		let gas = self.gas();
 
 		let memory_gas = match memory {
-			Some(memory) => try_or_fail!(self.inner, self.inner_mut()?.memory_gas(memory)),
-			None => self.inner_mut()?.memory_gas,
+			Some(memory) => self.inner.memory_gas(memory)?,
+			None => self.inner.memory_gas,
 		};
-		let gas_cost = try_or_fail!(self.inner, self.inner_mut()?.gas_cost(cost, gas));
-		let gas_refund = self.inner_mut()?.gas_refund(cost);
-		let used_gas = self.inner_mut()?.used_gas;
+		let gas_cost = self.inner.gas_cost(cost, gas)?;
+		let gas_refund = self.inner.gas_refund(cost);
+		let used_gas = self.inner.used_gas;
 
 		event!(RecordDynamicCost {
 			gas_cost,
@@ -198,16 +169,15 @@ impl<'config> Gasometer<'config> {
 
 		let all_gas_cost = memory_gas + used_gas + gas_cost;
 		if self.gas_limit < all_gas_cost {
-			self.inner = Err(ExitError::OutOfGas);
 			return Err(ExitError::OutOfGas);
 		}
 
 		let after_gas = self.gas_limit - all_gas_cost;
-		try_or_fail!(self.inner, self.inner_mut()?.extra_check(cost, after_gas));
+		self.inner.extra_check(cost, after_gas)?;
 
-		self.inner_mut()?.used_gas += gas_cost;
-		self.inner_mut()?.memory_gas = memory_gas;
-		self.inner_mut()?.refunded_gas += gas_refund;
+		self.inner.used_gas += gas_cost;
+		self.inner.memory_gas = memory_gas;
+		self.inner.refunded_gas += gas_refund;
 
 		Ok(())
 	}
@@ -220,7 +190,7 @@ impl<'config> Gasometer<'config> {
 			snapshot: self.snapshot(),
 		});
 
-		self.inner_mut()?.used_gas -= stipend;
+		self.inner.used_gas -= stipend;
 		Ok(())
 	}
 
@@ -259,21 +229,22 @@ impl<'config> Gasometer<'config> {
 		});
 
 		if self.gas() < gas_cost {
-			self.inner = Err(ExitError::OutOfGas);
 			return Err(ExitError::OutOfGas);
 		}
 
-		self.inner_mut()?.used_gas += gas_cost;
+		self.inner.used_gas += gas_cost;
 		Ok(())
 	}
 
+	// TODO comment to discourage use after another method returned `Err(_)`.
+	// TODO remove `Option` or mention it's there for backwards compatibility.
 	#[cfg(feature = "tracing")]
 	pub fn snapshot(&self) -> Option<Snapshot> {
-		self.inner.as_ref().ok().map(|inner| Snapshot {
+		Some(Snapshot {
 			gas_limit: self.gas_limit,
-			memory_gas: inner.memory_gas,
-			used_gas: inner.used_gas,
-			refunded_gas: inner.refunded_gas,
+			memory_gas: self.inner.memory_gas,
+			used_gas: self.inner.used_gas,
+			refunded_gas: self.inner.refunded_gas,
 		})
 	}
 }
